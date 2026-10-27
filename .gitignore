@@ -1,0 +1,8 @@
+.venv/
+.build_inputs/
+__pycache__/
+.pytest_cache/
+artifacts/screenshots/
+.streamlit/secrets.toml
+*.log
+*.zip

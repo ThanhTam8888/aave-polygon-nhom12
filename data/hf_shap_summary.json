@@ -1,0 +1,126 @@
+{
+  "model": "history34__XGB_400_d3",
+  "overall_validation_choice": "history34__XGB_400_d3",
+  "units": "log-odds of fitted model score, not calibrated probability",
+  "global_n": 2000,
+  "global_positive": 3,
+  "positive_n": 80,
+  "max_additivity_error": 5.7220458984375e-06,
+  "case": {
+    "version": "V3",
+    "wallet": "0x8ae928cb080aa43a50393cd08de208ef2b1bb86a",
+    "cutoff": "2024-01-01 00:00:00",
+    "target": 1,
+    "score": 0.7071709036827087,
+    "threshold": 0.3491055965423584,
+    "alert": true,
+    "health_factor": 1.0187116078207197,
+    "debt_usdc_equivalent": 151.31291898924982,
+    "base_log_odds": -3.972153902053833,
+    "top_contributions": [
+      {
+        "feature": "past_liquidation_count_30d",
+        "shap": 3.45625901222229,
+        "value": 2.0
+      },
+      {
+        "feature": "borrower_history_days",
+        "shap": -1.6126583814620972,
+        "value": 637.101318359375
+      },
+      {
+        "feature": "past_liquidation_count_90d",
+        "shap": 1.369969367980957,
+        "value": 4.0
+      },
+      {
+        "feature": "borrow_count_90d",
+        "shap": 1.102448582649231,
+        "value": 51.0
+      },
+      {
+        "feature": "withdraw_supply_ratio_30d",
+        "shap": 0.8701176643371582,
+        "value": 3.6666667461395264
+      },
+      {
+        "feature": "active_days_30d",
+        "shap": -0.7242339253425598,
+        "value": 19.0
+      },
+      {
+        "feature": "is_v3",
+        "shap": 0.656933605670929,
+        "value": 1.0
+      },
+      {
+        "feature": "repay_count_90d",
+        "shap": -0.40705934166908264,
+        "value": 5.0
+      }
+    ]
+  },
+  "importance": [
+    {
+      "feature": "borrower_history_days",
+      "mean_abs_shap_global": 1.0139329433441162,
+      "mean_abs_shap_positive": 0.9689397811889648
+    },
+    {
+      "feature": "past_liquidation_count_30d",
+      "mean_abs_shap_global": 0.07671857625246048,
+      "mean_abs_shap_positive": 0.6550387740135193
+    },
+    {
+      "feature": "borrow_count_90d",
+      "mean_abs_shap_global": 0.2560029625892639,
+      "mean_abs_shap_positive": 0.3762281537055969
+    },
+    {
+      "feature": "past_liquidation_count_90d",
+      "mean_abs_shap_global": 0.03993874788284302,
+      "mean_abs_shap_positive": 0.36230653524398804
+    },
+    {
+      "feature": "is_v3",
+      "mean_abs_shap_global": 0.18122468888759613,
+      "mean_abs_shap_positive": 0.29471462965011597
+    },
+    {
+      "feature": "withdraw_supply_ratio_30d",
+      "mean_abs_shap_global": 0.1907862275838852,
+      "mean_abs_shap_positive": 0.2804091274738312
+    },
+    {
+      "feature": "repay_count_90d",
+      "mean_abs_shap_global": 0.17904484272003174,
+      "mean_abs_shap_positive": 0.21133673191070557
+    },
+    {
+      "feature": "net_borrow_count_30d",
+      "mean_abs_shap_global": 0.18546396493911743,
+      "mean_abs_shap_positive": 0.20899918675422668
+    },
+    {
+      "feature": "active_days_30d",
+      "mean_abs_shap_global": 0.1496579498052597,
+      "mean_abs_shap_positive": 0.19637909531593323
+    },
+    {
+      "feature": "days_since_last_borrow",
+      "mean_abs_shap_global": 0.16382278501987457,
+      "mean_abs_shap_positive": 0.18231996893882751
+    },
+    {
+      "feature": "days_since_last_activity",
+      "mean_abs_shap_global": 0.20283398032188416,
+      "mean_abs_shap_positive": 0.1801871657371521
+    },
+    {
+      "feature": "repay_borrow_ratio_30d",
+      "mean_abs_shap_global": 0.14066751301288605,
+      "mean_abs_shap_positive": 0.11920517683029175
+    }
+  ],
+  "interpretation": "SHAP describes which columns the fitted model uses. It establishes no real-world causal explanation."
+}

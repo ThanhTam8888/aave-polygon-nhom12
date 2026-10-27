@@ -1,0 +1,152 @@
+{
+  "title": "Kiểm tra khả năng dự báo thanh lý trên Aave Polygon từ lịch sử giao dịch on-chain trong 7 ngày",
+  "source_archive": "ML_Nhom12_50K33.zip",
+  "source_archive_sha256": "3bd0e65e0667b438ca5a30ace4e7d857eb6104b2cd96826fee76c82c332f23f2",
+  "features": [
+    "borrow_count_7d",
+    "borrow_count_30d",
+    "repay_count_7d",
+    "repay_count_30d",
+    "supply_count_7d",
+    "supply_count_30d",
+    "withdraw_count_7d",
+    "withdraw_count_30d",
+    "collateral_toggle_count_7d",
+    "collateral_toggle_count_30d",
+    "emode_count_7d",
+    "emode_count_30d",
+    "rate_change_count_7d",
+    "rate_change_count_30d",
+    "activity_count_7d",
+    "activity_count_30d",
+    "borrow_count_1d",
+    "borrow_count_90d",
+    "repay_count_1d",
+    "repay_count_90d",
+    "activity_count_1d",
+    "activity_count_90d",
+    "days_since_last_borrow",
+    "days_since_last_repay",
+    "days_since_last_activity",
+    "borrower_history_days",
+    "activity_spike_7_vs_previous_23",
+    "repay_borrow_ratio_30d",
+    "withdraw_supply_ratio_30d",
+    "net_borrow_count_30d",
+    "active_days_30d",
+    "past_liquidation_count_30d",
+    "past_liquidation_count_90d",
+    "is_v3"
+  ],
+  "models": {
+    "Logistic": {
+      "name": "history34__LR_C0.1",
+      "filename": "history34__LR_C0.1.joblib",
+      "sha256": "5da6709e9b579861f96de1a461b2756a5823963e64643a7ddb80e3a98e0cbeeb",
+      "threshold": 0.898671229787387,
+      "validation_AP": 0.0005405913184976085,
+      "test": {
+        "n": 320974,
+        "positive": 80,
+        "AP": 0.0020426792715966583,
+        "ROC_AUC": 0.6486732378916403,
+        "precision": 0.008583690987124463,
+        "recall": 0.1,
+        "F2": 0.03194888178913738,
+        "tp": 8,
+        "fp": 924,
+        "fn": 72,
+        "tn": 319970,
+        "alerts": 932,
+        "threshold": 0.898671229787387
+      }
+    },
+    "Random Forest": {
+      "name": "history34__RF_300_d12",
+      "filename": "history34__RF_300_d12.joblib",
+      "sha256": "450dd2942751ebafb8e1a6ecc3e7fdc69c1490c6234235abd60cfaea776ecf26",
+      "threshold": 0.6508343780744568,
+      "validation_AP": 0.007333537884930658,
+      "test": {
+        "n": 320974,
+        "positive": 80,
+        "AP": 0.005478654695733707,
+        "ROC_AUC": 0.6306156004786627,
+        "precision": 0.029850746268656716,
+        "recall": 0.1,
+        "F2": 0.06802721088435375,
+        "tp": 8,
+        "fp": 260,
+        "fn": 72,
+        "tn": 320634,
+        "alerts": 268,
+        "threshold": 0.6508343780744568
+      }
+    },
+    "XGBoost": {
+      "name": "history34__XGB_400_d3",
+      "filename": "history34__XGB_400_d3.joblib",
+      "sha256": "0c7b6cd83d7bcf5e65b53536dc94a536e970a52e054b0b93b87b23e6cca159d5",
+      "threshold": 0.3491055965423584,
+      "validation_AP": 0.020311798930678755,
+      "test": {
+        "n": 320974,
+        "positive": 80,
+        "AP": 0.01604720063515901,
+        "ROC_AUC": 0.6908442702263052,
+        "precision": 0.03333333333333333,
+        "recall": 0.125,
+        "F2": 0.08064516129032259,
+        "tp": 10,
+        "fp": 290,
+        "fn": 70,
+        "tn": 320604,
+        "alerts": 300,
+        "threshold": 0.3491055965423584
+      }
+    }
+  },
+  "selected": {
+    "name": "history34__XGB_400_d3",
+    "family": "XGB",
+    "feature_set": "history34",
+    "feature_n": 34,
+    "validation_AP": 0.020311798930678755,
+    "threshold": 0.3491055965423584,
+    "train_seconds": 1.8263251781463623
+  },
+  "counts": {
+    "n": 320974,
+    "positives": 80,
+    "wallets": 23369,
+    "weekly_cutoffs": 47,
+    "HF_lt_1": 7991,
+    "HF_lt_1_debt_lt_1": 7593
+  },
+  "scope": "historical Polygon V2/V3 test 2024, debt > 0, observed-borrow proxy cohort; not live chain data",
+  "HF_color_rule": {
+    "red": "HF < 1",
+    "amber": "1 <= HF <= 1.3",
+    "green": "HF > 1.3",
+    "note": "1.3 is a demo monitoring boundary, not a universal safe threshold"
+  },
+  "preparation": {
+    "model_fitting": false,
+    "threshold_tuning": false,
+    "new_inference_for_demo": true,
+    "validation": {
+      "Logistic": {
+        "test_confusion_matches_report": true,
+        "test_AP_matches_report": true
+      },
+      "Random Forest": {
+        "test_confusion_matches_report": true,
+        "test_AP_matches_report": true
+      },
+      "XGBoost": {
+        "test_confusion_matches_report": true,
+        "test_AP_matches_report": true
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "requested": 1336903,
+  "resolved": 1336903,
+  "failed": 0,
+  "snapshot_states_not_raw_event_count": true,
+  "train_sampling_policy": "hf_experiment_policy.json",
+  "block_timestamp_lag_seconds_max": 4,
+  "hf_formula_relative_error_max": 0,
+  "elapsed_seconds": 1221.7595109939575,
+  "active_by_split": {
+    "test": {
+      "size": 320974,
+      "sum": 80
+    },
+    "train": {
+      "size": 131272,
+      "sum": 511
+    },
+    "validation": {
+      "size": 552742,
+      "sum": 30
+    }
+  },
+  "zero_debt_by_split": {
+    "test": {
+      "size": 103646,
+      "sum": 1
+    },
+    "train": {
+      "size": 69245,
+      "sum": 6
+    },
+    "validation": {
+      "size": 159024,
+      "sum": 0
+    }
+  },
+  "active_hf_below_1_by_split": {
+    "test": {
+      "size": 7991,
+      "sum": 5
+    },
+    "train": {
+      "size": 1982,
+      "sum": 107
+    },
+    "validation": {
+      "size": 8843,
+      "sum": 3
+    }
+  },
+  "debt_unit": "USDC.e equivalent using the contemporaneous oracle quote; NOT assumed USD",
+  "historical_sources": "Pool account state, AddressesProvider, AaveOracle reserve prices, all at identical cutoff block",
+  "market_returns_exact_calendar_days": 7,
+  "preceding_week_prices_at_purge_boundaries": true
+}

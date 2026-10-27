@@ -1,0 +1,64 @@
+{
+  "purpose": "post-hoc stress test of HF comparator after identifying tiny residual debt; not used for locked selection",
+  "rules": [
+    {
+      "min_debt_usdc_equivalent": 1,
+      "validation_AP": 0.001962160375840377,
+      "test": {
+        "n": 320974,
+        "positive": 80,
+        "AP": 0.0065819840849738786,
+        "ROC_AUC": 0.9573598680561182,
+        "precision": 0.011990407673860911,
+        "recall": 0.0625,
+        "F2": 0.033921302578018994,
+        "tp": 5,
+        "fp": 412,
+        "fn": 75,
+        "tn": 320482,
+        "alerts": 417,
+        "threshold": -1.0027110365217624
+      }
+    },
+    {
+      "min_debt_usdc_equivalent": 10,
+      "validation_AP": 0.0026017214815841085,
+      "test": {
+        "n": 320974,
+        "positive": 80,
+        "AP": 0.052881134458342624,
+        "ROC_AUC": 0.9418016151751045,
+        "precision": 0.21052631578947367,
+        "recall": 0.05,
+        "F2": 0.058997050147492625,
+        "tp": 4,
+        "fp": 15,
+        "fn": 76,
+        "tn": 320879,
+        "alerts": 19,
+        "threshold": -1.0027110365217624
+      }
+    },
+    {
+      "min_debt_usdc_equivalent": 100,
+      "validation_AP": 0.0012158075700060072,
+      "test": {
+        "n": 320974,
+        "positive": 80,
+        "AP": 0.0013609200370362183,
+        "ROC_AUC": 0.4327778214924555,
+        "precision": 0.0,
+        "recall": 0.0,
+        "F2": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 80,
+        "tn": 320894,
+        "alerts": 0,
+        "threshold": -0.9746836403474454
+      }
+    }
+  ],
+  "thresholds_not_economic_break_even_estimates": true,
+  "new_out_of_time_verification_required": true
+}
