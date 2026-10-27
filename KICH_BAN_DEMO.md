@@ -20,11 +20,16 @@ Mở **Chấm điểm vị thế**, để “Ca lịch sử thật”. Ba điể
 
 Nếu cần demo nhập liệu, chọn **Chấm CSV**, tải mẫu rồi tải lại đúng tệp đó và bấm chạy. Với chỉnh biến, phải giữ số đếm theo thứ tự 1 ≤ 7 ≤ 30 ≤ 90 ngày; tổng hành vi bằng hoạt động. Đây là giả định, không có nhãn tương lai thật.
 
-## 4. Ba mô hình 3D (2 phút)
+## 4. Một vị thế qua ba mô hình (3 phút)
 
-- **Logistic:** xoay mặt sigmoid, đổi hai trục. Các cột còn lại giữ ở ca nền. Chỉ z và điểm sau sigmoid. Bề mặt minh họa hàm, không phải tình huống đầy đủ được xác minh.
-- **Random Forest:** chọn cây 1 rồi cây 20, kéo độ sâu hiển thị. Rê nút và đọc bảng đường đi. Độ sâu hình có thể bị cắt, nhưng suy luận vẫn đi đến lá thật. Điểm rừng là trung bình 300 cây, không phải điểm của cây đang xem.
-- **XGBoost:** chọn 20 rồi 400 cây. Quan sát mây điểm 3D và đường điểm cộng dồn của ca. Đây là các cây đầu của booster 400 cây đã fit, không phải huấn luyện lại các mô hình mới. Hình lấy 4.000 âm và toàn bộ 80 dương; mật độ không đại diện tỷ lệ test.
+- **Ca thật và ba quyết định:** giữ ca đầu. Logistic cho 0,716 so ngưỡng 0,899; RF cho 0,463 so ngưỡng 0,651; XGBoost cho 0,707 so ngưỡng 0,349. Chỉ XGBoost cảnh báo. Điểm Logistic cao hơn nhưng không cảnh báo, vì ngưỡng khác nhau.
+- **Giải thích cơ chế:** lần lượt chọn Logistic, RF, XGBoost. Logistic cộng tín hiệu theo trọng số; RF lấy trung bình điểm của 300 cây; XGBoost cộng dần điều chỉnh của 400 cây. Mở số liệu cơ chế khi thầy hỏi sâu; các số đang xem dùng đúng đầu vào của chấm 3D.
+- **Thử đầu vào:** giữ lịch sử khoảng 637,1 ngày, chuyển thanh lý 30 ngày từ 0 sang 1. XGBoost đổi khoảng 0,0477 thành 0,6673 và vượt ngưỡng. Phần ngày 31–90 giữ 2 lần, nên 0 lần gần đây không phải chưa có tiền sử 90 ngày. Đầu vào đang thử không có nhãn tương lai.
+- **Kiểm chứng:** nhấn Trở về ca thật, sang Kiểm chứng kết quả. Ca gốc có thanh lý sau khoảng 2,75 ngày. Đọc thêm toàn test và quy tắc đơn giản để tránh kết luận từ một ca thuận lợi.
+
+Kịch bản từng mốc thời gian và cách trả lời câu hỏi nằm trong **PHUONG_AN_SHOWCASE_3D.md**. Bản đồ thứ hạng được giữ trong Phân tích sâu, chỉ mở khi cần phản biện về nhóm bị bỏ sót và sự đồng thuận mô hình.
+
+Điểm ba mô hình khác thang. Trục xếp hạng cho biết có bao nhiêu snapshot test đạt điểm cao hơn hoặc bằng ca đang xét; thang log tách vùng top nhỏ. Mặt phẳng phân loại chính xác các điểm lịch sử. Với kịch bản mới, thứ hạng có thể đồng hạng; bảng luôn xét cảnh báo bằng điểm gốc và ngưỡng gốc.
 
 ## 5. So sánh mô hình và trả lời phản biện (90 giây)
 
@@ -42,4 +47,6 @@ So quy tắc 90 ngày: 24/80 ca, 787 cảnh báo và F2 cao hơn ở ngưỡng r
 
 1. **Tại sao HF không vào mô hình cuối?** Đã thử các bộ trạng thái/kết hợp; history34 vẫn cao nhất trên validation trong cấu hình đã thử. HF vẫn là trạng thái, đối chứng và tiêu chí phân nhóm.
 2. **Đã ngăn được 10 vụ chưa?** Chưa. Đó là 10 snapshot đúng trong backtest, thuộc 7 ví, đều có tiền sử 90 ngày. Không có nghiên cứu can thiệp.
-3. **Có chạy thật không?** Có: pipeline chấm trực tiếp ca/CSV, TreeSHAP chạy từ booster, cây 3D lấy từ fitted RF. Dữ liệu là lịch sử, không phải số dư live.
+3. **Có chạy thật không?** Có: pipeline chấm trực tiếp ca/CSV và lưới hợp lệ, TreeSHAP chạy từ booster, điểm từng cây đọc từ fitted RF. Dữ liệu là lịch sử, không phải số dư live.
+4. **Tại sao chọn hai trục bề mặt đó?** Tuổi lịch sử và tiền sử thanh lý 30 ngày có mean |SHAP| lớn nhất trên các ca dương của XGBoost; không suy ra nguyên nhân thực tế.
+5. **Bề mặt có là vị thế đã từng tồn tại không?** Không bảo đảm. App kiểm tra ràng buộc theo dữ liệu hiện có; số mẫu trong ô chỉ là tham chiếu trên hai trục, không xác nhận toàn bộ tổ hợp đầu vào.

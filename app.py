@@ -11,6 +11,7 @@ from sklearn.metrics import precision_recall_curve, roc_curve
 
 import aave_core as core
 import charts
+from model_lab import show_model_lab
 
 ROOT = Path(__file__).resolve().parent
 NAV = ["Tổng quan", "Theo dõi HF", "Chấm điểm vị thế", "Mô hình 3D", "Đối chiếu kết quả", "Hướng dẫn demo"]
@@ -25,13 +26,6 @@ def render_chart(fig, *, key, width="stretch"):
               "scrollZoom": is_3d, "responsive": True,
               "toImageButtonOptions": {"format": "png", "filename": key, "scale": 2},
               "modeBarButtonsToRemove": [] if is_3d else ["lasso2d", "select2d"]}
-    if is_3d:
-        camera = st.session_state.get("lab_camera", "Phối cảnh")
-        if camera == "Chính diện":
-            fig.update_layout(scene_camera=dict(eye=dict(x=.05, y=2.8, z=.4), up=dict(x=0, y=0, z=1)))
-        elif camera == "Từ trên":
-            fig.update_layout(scene_camera=dict(eye=dict(x=.05, y=.05, z=3), up=dict(x=0, y=1, z=0)))
-        fig.update_layout(uirevision=f"{fig.layout.uirevision}-{camera}-{st.session_state.get('camera_revision', 0)}")
     st.plotly_chart(fig, width=width, key=key, theme=None, config=config)
 
 
@@ -286,75 +280,7 @@ def scoring_page(df, row):
 
 
 def lab_page(df, row):
-    hero("03 / PHÒNG MÔ HÌNH 3D", "Xoay mô hình. Theo từng quyết định.", "Các bề mặt, nhánh cây và điểm ở đây lấy từ mô hình thật. Kéo để xoay, cuộn để phóng to; đọc bảng bên dưới để nối hình ảnh với phép tính.")
-    case_banner(row)
-    name = st.radio("Chọn thuật toán", list(core.SCORE_COLUMNS), horizontal=True, key="lab_model")
-    view_col, reset_col = st.columns([3, 1], vertical_alignment="bottom")
-    with view_col:
-        st.segmented_control("Góc nhìn 3D", ["Phối cảnh", "Chính diện", "Từ trên"], default="Phối cảnh", key="lab_camera")
-    with reset_col:
-        if st.button("Đặt lại góc nhìn", width="stretch", key="reset_camera"):
-            st.session_state["camera_revision"] = st.session_state.get("camera_revision", 0) + 1
-    st.markdown('<div class="chart-guide"><strong>Kéo</strong> để xoay · <strong>Cuộn trong hình</strong> để phóng to · <strong>Rê chuột</strong> để đọc giá trị · Dùng nút góc nhìn nếu khó quan sát. Mọi hình đều lấy từ mô hình đã lưu.</div>', unsafe_allow_html=True)
-    if name == "Logistic":
-        a, b = st.columns([1.8, 1])
-        features = core.summary()["features"]
-        with b:
-            st.subheader("Tổ hợp tuyến tính → sigmoid")
-            axes = ["borrow_count_30d", "repay_count_30d", "past_liquidation_count_30d", "past_liquidation_count_90d", "borrower_history_days", "days_since_last_borrow", "active_days_30d", "activity_count_30d"]
-            xname = st.selectbox("Trục X", axes, index=0, format_func=core.label, key="lr_x")
-            yoptions = [f for f in axes if f != xname]
-            yname = st.selectbox("Trục Y", yoptions, index=yoptions.index("past_liquidation_count_90d") if "past_liquidation_count_90d" in yoptions else 0, format_func=core.label, key="lr_y")
-            x_max = max(5., min(float(df[xname].quantile(.99)), 5000.), float(row[xname])*1.1)
-            y_max = max(5., min(float(df[yname].quantile(.99)), 5000.), float(row[yname])*1.1)
-            st.latex(r"z=\beta_0+\sum_j\beta_j\widetilde{x}_j,\qquad s=\frac{1}{1+e^{-z}}")
-            obj = core.load_model(name)
-            X = np.array([[row[f] for f in features]], np.float32)
-            imp = obj["pipeline"].named_steps["impute"].transform(X)
-            scaled = obj["pipeline"].named_steps["scale"].transform(imp)
-            clf = obj["pipeline"].named_steps["clf"]
-            z = float(clf.decision_function(scaled)[0])
-            st.metric("z của ca đang xem", f"{z:.4f}")
-            st.metric("Điểm sau sigmoid", f"{1/(1+np.exp(-z)):.5f}")
-            st.caption("Bề mặt chỉ thay hai cột, giữ 32 cột khác ở ca nền. Đây là minh họa độ nhạy của hàm, không phải vị thế giả định đã được kiểm tra nhất quán hay mô phỏng nhân quả.")
-        with a:
-            render_chart(charts.logistic_surface(row, xname, yname, x_max, y_max), width="stretch", key="lr_surface")
-        contrib = clf.coef_[0]*scaled[0]
-        top = pd.DataFrame({"Biến": [core.label(f) for f in features], "Đóng góp β × x chuẩn hóa": contrib}).iloc[np.argsort(np.abs(contrib))[::-1][:8]]
-        st.dataframe(top, hide_index=True, width="stretch")
-        st.caption("C = 0,1 · chuẩn hóa học từ train · phạt L2. Điểm 0–1 chưa phải xác suất thực tế đã kiểm chứng.")
-    elif name == "Random Forest":
-        a, b = st.columns([1.8, 1])
-        with b:
-            st.subheader("Một cây trong rừng 300 cây")
-            tree_index = st.slider("Chọn cây", 1, 300, 1, key="rf_tree") - 1
-            depth = st.slider("Hiển thị đến độ sâu", 2, 6, 4, key="rf_depth")
-            st.write("Màu vàng là đường đi của ca đang xem. Rê chuột vào nút để thấy biến, ngưỡng chia, số mẫu và điểm tại nút.")
-            st.caption("Trái: giá trị ≤ ngưỡng. Phải: giá trị > ngưỡng. Cắt hình ở độ sâu chọn chỉ để dễ xem; cây thật vẫn được chấm đến lá.")
-        fig, steps, info = charts.tree3d(row, tree_index, depth)
-        with a:
-            render_chart(fig, width="stretch", key="rf_tree3d")
-        kpis([("Điểm cây đang xem", f'{info["tree_score"]:.4f}', f'Lá {info["leaf"]}'),
-              ("Điểm cả rừng", f'{info["forest_score"]:.4f}', "Trung bình của 300 cây"),
-              ("Độ sâu thật của cây", str(info["actual_depth"]), f'{info["nodes"]} nút thật')])
-        st.subheader("Theo dấu đường đi đến lá")
-        st.dataframe(steps, hide_index=True, width="stretch")
-        st.caption("RF_300_d12: 300 cây, sâu tối đa 12, tối thiểu 30 mẫu/lá, sqrt(34) ≈ 5 biến ứng viên/nút, tối đa 100.000 lượt bootstrap/cây. Các ngưỡng trong bảng là ngưỡng thật đã học.")
-    else:
-        a, b = st.columns([1.8, 1])
-        with b:
-            st.subheader("Các cây cộng dồn thành điểm")
-            n_trees = st.slider("Xem các cây đầu của mô hình 400 cây", 1, 400, 400, key="xgb_trees")
-            st.latex(r"z_M=b+\sum_{m=1}^{M}\Delta_m,\qquad s=\sigma(z_M)")
-            st.write("Mỗi cây thêm một cập nhật đã được thu nhỏ bởi learning rate 0,05. Cây sâu tối đa 3; số cây và độ sâu là hai tham số khác nhau.")
-            st.caption("Đây là các cây đầu của mô hình 400 cây đã fit, không phải huấn luyện một mô hình mới có M cây. Giảm M không thay mô hình được chọn trong báo cáo.")
-        sample = pd.concat([df[df.target.eq(0)].sample(4000, random_state=42), df[df.target.eq(1)]]).copy()
-        with a:
-            render_chart(charts.xgb_cloud(sample, n_trees), width="stretch", key="xgb_cloud")
-        st.caption("Hình 3D gồm 4.000 âm lấy mẫu đều và toàn bộ 80 dương. Mật độ không đại diện tỷ lệ của toàn tập; cả 34 biến vẫn được dùng để tính điểm, không chỉ hai trục đang vẽ.")
-        st.subheader("Điểm ca đang xem khi cộng thêm cây")
-        render_chart(charts.boosting_path(row), width="stretch", key="boosting_path")
-        st.caption("Ngưỡng khóa chỉ được chọn cho cấu hình đủ 400 cây. Đường nét đứt trên các giai đoạn chỉ là mốc tham chiếu.")
+    show_model_lab(df, row, case_banner, render_chart, navigate)
 
 
 def results_page(df, row):
@@ -426,7 +352,7 @@ def demo_page():
         ("1 · Bài toán, 45 giây", "Tổng quan", "Chúng em kiểm tra dự báo sự kiện thanh lý trong bảy ngày. Dữ liệu là lịch sử 2024; HF hiện tại, điểm mô hình và nhãn tương lai là ba đại lượng khác nhau."),
         ("2 · HF và ca thật, 60 giây", "Theo dõi HF", "Chọn ca HF đỏ/nợ nhỏ rồi ca xanh. Kéo biến động thế chấp để thấy HF thay đổi. Mốc vàng 1–1,3 là quy ước theo dõi, không bảo đảm an toàn."),
         ("3 · Chạy ba mô hình, 60 giây", "Chấm điểm vị thế", "Mở ca cảnh báo đúng. Điểm được tính trực tiếp từ pipeline. Đọc ngưỡng riêng từng mô hình và SHAP; HF không nằm trong 34 biến."),
-        ("4 · Ba mô hình 3D, 2 phút", "Mô hình 3D", "Logistic: hai trục trên bề mặt sigmoid. RF: đổi cây, đọc nhánh vàng và lá thật. XGBoost: kéo số cây đầu, quan sát điểm phân tán và đường cộng dồn."),
+        ("4 · Một vị thế qua ba mô hình, 3 phút", "Mô hình 3D", "Chọn cùng ca thật, đọc điểm và ngưỡng riêng của Logistic/RF/XGBoost. Đổi số lần thanh lý gần đây để thấy điểm thật cập nhật. Mở cơ chế của mô hình đang chọn; sau đó sang Kiểm chứng kết quả để đọc điều thực sự xảy ra trong 7 ngày."),
         ("5 · Kiểm chứng và phản biện, 90 giây", "Đối chiếu kết quả", "Đọc 10 TP, 290 FP, 70 FN; so quy tắc 90 ngày. Bỏ chọn ngưỡng khóa và thử cắt khác để thấy precision/recall đổi nhưng AP không đổi."),
         ("6 · Kết luận, 30 giây", "Đối chiếu kết quả", "Nhóm đã xây quy trình và kiểm tra tín hiệu; mô hình phụ thuộc tiền sử. Cần dữ liệu đầy đủ hơn và kiểm chứng thời gian mới trước khi vận hành."),
     ]
@@ -439,8 +365,12 @@ def demo_page():
     st.subheader("Câu trả lời ngắn khi thầy hỏi")
     with st.expander("Vì sao kéo HF mà điểm XGBoost không đổi?"):
         st.write("Vì mô hình được chọn sử dụng 34 biến hành vi và tiền sử. HF là trạng thái/đối chứng riêng, không được tự thêm vào đầu vào mô hình đã fit.")
-    with st.expander("Cây 3D có phải hình minh họa tự vẽ không?"):
-        st.write("Đồ thị lấy cấu trúc, ngưỡng, số mẫu và đường đi từ chính cây RF đã fit. XGBoost cũng chạy booster đã lưu, không tạo điểm ngẫu nhiên.")
+    with st.expander("Tại sao dùng thứ hạng thay cho điểm thô trên bản đồ 3D?"):
+        st.write("Ba mô hình có thang điểm khác nhau. Mỗi trục đổi điểm thành tỷ lệ snapshot test có điểm cao hơn hoặc bằng nó, để so mức ưu tiên. Mặt phẳng đúng với các điểm lịch sử đang vẽ; đó không phải xác suất thanh lý.")
+    with st.expander("Bề mặt phản ứng có chứng minh nguyên nhân không?"):
+        st.write("Không. App chấm lại một lưới đầu vào bằng pipeline đã lưu: thay số lần thanh lý 30 ngày, cập nhật 90 ngày để giữ phần 31–90 ngày, và thay tuổi lịch sử; các cột còn lại giữ nguyên. Lưới được kiểm tra ràng buộc, nhưng không bảo đảm từng kịch bản đã tồn tại ngoài đời.")
+    with st.expander("Vì sao chọn tiền sử thanh lý và tuổi lịch sử làm hai trục?"):
+        st.write("Tuổi lịch sử vay và số lần thanh lý 30 ngày có mean |SHAP| lớn nhất trên các ca dương của XGBoost trong dữ liệu đã phân tích. Đây là lựa chọn phục vụ giải thích, không phải xác nhận hai biến gây thanh lý.")
     with st.expander("Nhập một địa chỉ ví mới thì dự báo ngay được không?"):
         st.write("Chưa. Phải có lịch sử và trạng thái phù hợp để tạo đủ feature. App tra cứu các snapshot lịch sử đã chuẩn bị; CSV/tình huống tự nhập là suy luận trên đầu vào cung cấp, không xác minh on-chain trực tiếp.")
     st.download_button("Tải kịch bản demo (Markdown)", (ROOT / "KICH_BAN_DEMO.md").read_bytes(), "KICH_BAN_DEMO.md", "text/markdown")

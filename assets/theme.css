@@ -73,6 +73,14 @@ p { line-height: 1.8; }
 .chart-guide { margin: 0 0 15px; padding: 10px 14px; color: #b8c7d8; font-size: .73rem; line-height: 1.8; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.025); }
 .chart-guide strong { color: #e5ecf6; font-weight: 500; }
 .section-kicker { margin: 17px 0 8px; color: #91a1b6; font-size: .64rem; letter-spacing: .12em; }
+.lesson-model { border: 1px solid var(--line); border-top: 2px solid var(--model-color); border-radius: 12px; padding: 13px 17px; margin-bottom: 12px; background: rgba(36,43,52,.5); }
+.lesson-model.selected { background: rgba(56,65,76,.68); }
+.lesson-model-name { color: var(--model-color); font-size: .87rem; font-weight: 600; }
+.lesson-model-score { font-size: 1.85rem; font-weight: 600; line-height: 1.4; color: #eff4fa; }
+.lesson-model-rule { font-size: .7rem; color: #becadb; line-height: 1.7; }
+.lesson-flow { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; margin: 15px 0 20px; }
+.lesson-flow > div { position: relative; border: 1px solid var(--line); padding: 14px 16px; border-radius: 10px; color: #d8e2ee; font-size: .85rem; background: rgba(31,38,46,.55); }
+.lesson-flow > div:not(:last-child)::after { content: '→'; position: absolute; right: -17px; top: 13px; color: #8798ab; }
 [data-testid="stVerticalBlockBorderWrapper"] > div, [data-testid="stLayoutWrapper"]:has(> [data-testid="stVerticalBlock"][data-test-scroll-behavior]) { border-radius: 17px; }
 [data-testid="stVerticalBlockBorderWrapper"] > div { background: rgba(24,29,36,.55); border-color: var(--line) !important; }
 [data-testid="stPlotlyChart"] { border: 1px solid var(--line); border-radius: 17px; overflow: hidden; background: linear-gradient(135deg, rgba(34,41,50,.64), rgba(25,30,37,.7)); padding: 4px; box-shadow: inset 0 1px 0 rgba(255,255,255,.025); }
@@ -100,6 +108,8 @@ p { line-height: 1.8; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media (min-width: 1600px) { .block-container { padding-left: 3.5rem; padding-right: 3.5rem; } }
 @media (max-width: 750px) {
+  .lesson-flow { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .lesson-flow > div::after { display: none; }
   .block-container { padding: 1.1rem 1rem 2rem; }
   .hero { padding: 23px 21px; border-radius: 17px; }
   .hero h1 { font-size: 1.8rem !important; }

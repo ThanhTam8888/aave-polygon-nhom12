@@ -17,18 +17,6 @@ GRID = "rgba(166,177,194,.13)"
 PANEL = "#15191F"
 
 
-def _wrapped(text, width=23):
-    """Wrap prose axis labels without changing the feature or plotted values."""
-    lines, current = [], ""
-    for word in text.split():
-        if current and len(current)+len(word)+1 > width:
-            lines.append(current)
-            current = word
-        else:
-            current = (current+" "+word).strip()
-    return "<br>".join(lines+[current])
-
-
 def _scene(x_title, y_title, z_title, *, camera=None, z_range=None):
     # WebGL scene grid alpha varies by renderer; solid dark strokes stay subtle.
     axis = dict(backgroundcolor=PANEL, showbackground=True, gridcolor="#303844",
@@ -126,7 +114,8 @@ def waterfall(contrib, baseline, margin):
     ordered = contrib.reindex(contrib.contribution.abs().sort_values(ascending=False).index)
     top = ordered.head(7)
     rest = float(ordered.iloc[7:].contribution.sum())
-    fig = go.Figure(go.Waterfall(orientation="h", y=["Điểm nền"]+top.label.tolist()+["27 biến còn lại", "Margin cuối"],
+    remaining = len(ordered) - len(top)
+    fig = go.Figure(go.Waterfall(orientation="h", y=["Điểm nền"]+top.label.tolist()+[f"{remaining} biến còn lại", "Margin cuối"],
                                 x=[baseline]+top.contribution.tolist()+[rest, 0],
                                 measure=["absolute"]+["relative"]*8+["total"],
                                 increasing=dict(marker=dict(color=RED)), decreasing=dict(marker=dict(color=TEAL)),
@@ -139,132 +128,14 @@ def waterfall(contrib, baseline, margin):
     return polish(fig, 465, showlegend=False, margin=dict(l=10, r=55, t=20, b=55))
 
 
-def logistic_surface(row, xname, yname, x_max, y_max):
-    obj = load_model("Logistic")
-    features = obj["features"]
-    xs, ys = np.linspace(0, x_max, 28), np.linspace(0, y_max, 28)
-    xx, yy = np.meshgrid(xs, ys)
-    X = np.tile(np.array([row[f] for f in features], np.float32), (xx.size, 1))
-    X[:, features.index(xname)], X[:, features.index(yname)] = xx.ravel(), yy.ravel()
-    zz = obj["pipeline"].predict_proba(X)[:, 1].reshape(xx.shape)
-    point = float(obj["pipeline"].predict_proba(np.array([[row[f] for f in features]], np.float32))[0, 1])
-    fig = go.Figure(go.Surface(x=xs, y=ys, z=zz,
-                               colorscale=[[0, "#254F64"], [.3, "#358D9B"], [.6, TEAL], [.82, AMBER], [1, RED]],
-                               cmin=0, cmax=1, colorbar=dict(title=dict(text="Điểm", side="right"), len=.55, thickness=9, x=1.01,
-                                                           tickvals=[0, .5, 1], tickfont=dict(color=MUTED, size=10), outlinewidth=0),
-                               lighting=dict(ambient=.82, diffuse=.8, specular=.18, roughness=.85),
-                               contours=dict(z=dict(show=True, color="rgba(231,237,245,.22)", width=1)),
-                               opacity=.96, name="Bề mặt điểm",
-                               hovertemplate=f"{label(xname)}: %{{x:.2f}}<br>{label(yname)}: %{{y:.2f}}<br>Điểm: %{{z:.4f}}<extra></extra>"))
-    fig.add_trace(go.Scatter3d(x=[row[xname]], y=[row[yname]], z=[point], mode="markers+text",
-                              marker=dict(color=INK, size=7, line=dict(color="#18202A", width=3)), name="Ca đang xem",
-                              text=["Ca đang xem"], textposition="top center", textfont=dict(color=INK, size=11),
-                              hovertemplate=f"Ca đang xem<br>Điểm Logistic: {point:.5f}<extra></extra>"))
-    polish(fig, 570, margin=dict(l=0, r=35, t=12, b=48))
-    fig.update_layout(scene=_scene(_wrapped(label(xname)), _wrapped(label(yname)), "Điểm Logistic", z_range=[0, 1]),
-                      legend=dict(orientation="h", x=0, y=-.04, font=dict(color=MUTED, size=11)),
-                      uirevision=f"logistic-{xname}-{yname}")
-    return fig
-
-
-def tree3d(row, tree_index=0, max_depth=4):
-    obj = load_model("Random Forest")
-    clf = obj["pipeline"].named_steps["clf"]
-    x = np.array([[row[f] for f in obj["features"]]], np.float32)
-    x = obj["pipeline"].named_steps["impute"].transform(x)
-    estimator = clf.estimators_[tree_index]
-    t = estimator.tree_
-    path = set(estimator.decision_path(x).indices.tolist())
-    nodes, edges = [], []
-    def visit(node, depth, xpos, span):
-        vals = t.value[node, 0]
-        score = float(vals[1] / vals.sum())
-        feature = obj["features"][t.feature[node]] if t.feature[node] >= 0 else None
-        desc = f"Nút {node}<br>" + (f"{label(feature)} ≤ {t.threshold[node]:.4g}" if feature else "Lá") + f"<br>Mẫu ở nút: {t.n_node_samples[node]}<br>Điểm dương ở nút: {score:.4f}"
-        if depth == max_depth and t.children_left[node] != -1:
-            desc += "<br>Hình dừng ở độ sâu chọn; cây vẫn tiếp tục"
-        nodes.append(dict(id=node, x=xpos, y=score, z=-depth, text=desc, path=node in path, depth=depth))
-        if depth < max_depth and t.children_left[node] != -1:
-            for child, shift in [(t.children_left[node], -span), (t.children_right[node], span)]:
-                visit(child, depth+1, xpos+shift, span/2)
-                edges.append((node, child))
-    visit(0, 0, 0., 1.)
-    lookup = {n["id"]: n for n in nodes}
-    fig = go.Figure()
-    for highlighted in [False, True]:
-        xline, yline, zline = [], [], []
-        for parent, child in edges:
-            if ((parent in path and child in path) == highlighted):
-                a, b = lookup[parent], lookup[child]
-                xline += [a["x"], b["x"], None]
-                yline += [a["y"], b["y"], None]
-                zline += [a["z"], b["z"], None]
-        fig.add_trace(go.Scatter3d(x=xline, y=yline, z=zline, mode="lines", hoverinfo="skip",
-                                   opacity=1 if highlighted else .45,
-                                   line=dict(color=AMBER if highlighted else "#5A6C7D", width=7 if highlighted else 2),
-                                   name="Đường đi của ca" if highlighted else "Nhánh khác"))
-    for highlighted in [False, True]:
-        group = [n for n in nodes if n["path"] == highlighted]
-        fig.add_trace(go.Scatter3d(x=[n["x"] for n in group], y=[n["y"] for n in group], z=[n["z"] for n in group],
-                                  mode="markers+text" if highlighted else "markers",
-                                  text=[str(n["id"]) for n in group] if highlighted else None,
-                                  textfont=dict(size=11, color=INK), textposition="top center",
-                                  hovertext=[n["text"] for n in group], hovertemplate="%{hovertext}<extra></extra>", showlegend=False,
-                                  marker=dict(size=8 if highlighted else 4.5, color=AMBER if highlighted else BLUE,
-                                              opacity=1 if highlighted else .68,
-                                              line=dict(color="#18202A", width=1))))
-    polish(fig, 600, margin=dict(l=0, r=15, t=16, b=35))
-    scene = _scene("Các nhánh của cây", "Điểm dương<br>ở nút", "Độ sâu", camera=dict(eye=dict(x=.6, y=2.65, z=.75)))
-    scene["xaxis"].update(showticklabels=False, showgrid=False)
-    scene["yaxis"].update(range=[0, 1], nticks=3)
-    scene["zaxis"].update(tickvals=[-d for d in range(max_depth+1)], ticktext=[str(d) for d in range(max_depth+1)])
-    scene["aspectratio"] = dict(x=1.8, y=.6, z=1.15)
-    fig.update_layout(scene=scene, uirevision=f"forest-{tree_index}-{max_depth}",
-                      legend=dict(orientation="h", x=0, y=-.02, font=dict(color=MUTED, size=11)))
-    steps = []
-    for node in estimator.decision_path(x).indices:
-        fidx = t.feature[node]
-        if fidx >= 0:
-            feature = obj["features"][fidx]
-            value = float(x[0, fidx])
-            steps.append({"Nút": int(node), "Biến": label(feature), "Giá trị ca": value, "Ngưỡng": float(t.threshold[node]),
-                          "Rẽ": "Trái (≤)" if value <= t.threshold[node] else "Phải (>)"})
-    leaf = int(estimator.apply(x)[0])
-    score = float(estimator.predict_proba(x)[0, 1])
-    forest_score = float(clf.predict_proba(x)[0, 1])
-    return fig, pd.DataFrame(steps), {"leaf": leaf, "tree_score": score, "forest_score": forest_score, "actual_depth": estimator.get_depth(), "nodes": t.node_count}
-
-
-def xgb_cloud(sample, tree_limit=400):
-    obj = load_model("XGBoost")
-    X = sample[obj["features"]].to_numpy(np.float32)
-    X = obj["pipeline"].named_steps["impute"].transform(X)
-    booster = obj["pipeline"].named_steps["clf"].get_booster()
-    scores = booster.predict(DMatrix(X), iteration_range=(0, tree_limit))
-    fig = go.Figure()
-    for target, color, name in [(0, BLUE, "Không ghi nhận thanh lý"), (1, RED, "Có thanh lý 7 ngày sau")]:
-        mask = sample.target.to_numpy() == target
-        g = sample.loc[mask]
-        fig.add_trace(go.Scatter3d(x=np.log1p(g.borrow_count_30d), y=np.log1p(g.borrower_history_days), z=scores[mask], mode="markers", name=name,
-                                  marker=dict(color=color, size=6 if target else 2.7, opacity=1 if target else .22,
-                                              line=dict(color="#FFE6EB" if target else color, width=.7 if target else 0)),
-                                  customdata=np.column_stack([g.borrow_count_30d, g.borrower_history_days]),
-                                  hovertemplate="Vay 30 ngày: %{customdata[0]:.0f}<br>Tuổi lịch sử: %{customdata[1]:.1f} ngày<br>Điểm: %{z:.5f}<extra>%{fullData.name}</extra>"))
-    polish(fig, 580, margin=dict(l=0, r=15, t=16, b=55))
-    scene = _scene("Vay 30 ngày<br>ln(1 + số lần)", "Lịch sử vay<br>ln(1 + số ngày)", "Điểm XGBoost", z_range=[0, 1],
-                   camera=dict(eye=dict(x=1.65, y=1.85, z=1.25)))
-    fig.update_layout(scene=scene, uirevision="xgb-cloud",
-                      legend=dict(orientation="h", x=0, y=-.05, font=dict(color=MUTED, size=11)))
-    return fig
-
-
 def boosting_path(row):
     obj = load_model("XGBoost")
     X = np.array([[row[f] for f in obj["features"]]], np.float32)
     X = obj["pipeline"].named_steps["impute"].transform(X)
     dm = DMatrix(X)
     booster = obj["pipeline"].named_steps["clf"].get_booster()
-    stages = [1, 5, 10, 20, 40, 60, 80, 100, 150, 200, 250, 300, 350, 400]
+    count = booster.num_boosted_rounds()
+    stages = np.unique(np.r_[1, np.geomspace(min(5, count), count, 13).round().astype(int)]).tolist()
     scores = [float(booster.predict(dm, iteration_range=(0, k))[0]) for k in stages]
     fig = go.Figure(go.Scatter(x=stages, y=scores, mode="lines+markers", line=dict(color=TEAL, width=2.5),
                               marker=dict(size=6, line=dict(color=PANEL, width=1)), name="Điểm của ca",
@@ -272,6 +143,37 @@ def boosting_path(row):
                               fill="tozeroy", fillcolor="rgba(105,222,208,.07)"))
     fig.add_hline(y=obj["threshold"], line_dash="dash", line_color=RED, line_width=1.2,
                   annotation_text="Ngưỡng khóa · tham chiếu ở 400 cây", annotation_position="top left", annotation_font=dict(color=RED, size=10))
-    fig.update_xaxes(title="Số cây đầu của mô hình 400 cây đã fit")
+    fig.update_xaxes(title=f"Số cây đầu của mô hình {count} cây đã fit")
     fig.update_yaxes(title="Điểm", range=[0, 1])
     return polish(fig, 310, showlegend=False, hovermode="x unified")
+
+
+def lr_contribution_bar(diagnostics: dict) -> go.Figure:
+    """Show an additive decomposition that exactly reconstructs the Logistic margin."""
+    frame = diagnostics["contributions"]
+    ordered = frame.reindex(frame.contribution.abs().sort_values(ascending=False).index)
+    top, rest = ordered.head(8), ordered.iloc[8:]
+    names = ["Intercept"] + [label(feature) for feature in top.feature] + [f"{len(rest)} biến còn lại"]
+    values = [diagnostics["intercept"]] + top.contribution.tolist() + [float(rest.contribution.sum())]
+    fig = go.Figure(go.Bar(y=names, x=values, orientation="h",
+                          marker_color=[RED if value > 0 else TEAL for value in values],
+                          text=[f"{value:+.3f}" for value in values], textposition="outside", cliponaxis=False,
+                          hovertemplate="%{y}<br>Đóng góp vào z: %{x:.5f}<extra></extra>"))
+    fig.update_yaxes(autorange="reversed")
+    fig.update_xaxes(title="Đóng góp vào z = intercept + Σ β × x chuẩn hóa")
+    fig.add_vline(x=0, line_color=MUTED, line_width=1)
+    return polish(fig, 450, showlegend=False, margin=dict(l=10, r=65, t=15, b=55))
+
+
+def rf_vote_histogram(diagnostics: dict) -> go.Figure:
+    """Display the distribution of fitted-tree scores, not fictitious binary votes."""
+    fig = go.Figure(go.Histogram(x=diagnostics["scores"], xbins=dict(start=0, end=1, size=.05),
+                                marker=dict(color=AMBER, line=dict(color="#15191F", width=1)),
+                                hovertemplate="Khoảng điểm %{x}<br>%{y} cây<extra></extra>"))
+    fig.add_vline(x=diagnostics["score"], line_color=TEAL, line_width=2,
+                  annotation_text=f"Điểm rừng {diagnostics['score']:.3f}", annotation_position="top left")
+    fig.add_vline(x=diagnostics["threshold"], line_color=INK, line_dash="dash",
+                  annotation_text=f"Ngưỡng {diagnostics['threshold']:.3f}", annotation_position="top right")
+    fig.update_xaxes(title="Điểm do từng cây chấm cho cùng vị thế", range=[0, 1])
+    fig.update_yaxes(title="Số cây", dtick=50)
+    return polish(fig, 360, showlegend=False, margin=dict(l=15, r=15, t=45, b=55))

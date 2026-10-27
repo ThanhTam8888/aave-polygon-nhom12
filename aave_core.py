@@ -4,6 +4,7 @@ from functools import lru_cache
 import hashlib
 import json
 import math
+from typing import Mapping, Sequence
 
 import joblib
 import numpy as np
@@ -128,6 +129,105 @@ def predict(row, name="XGBoost"):
     score = float(obj["pipeline"].predict_proba(values)[0, 1])
     return {"model": name, "score": score, "threshold": obj["threshold"], "alert": bool(score >= obj["threshold"]),
             "score_is_calibrated_probability": False}
+
+
+class RankScale:
+    """Empirical upper-tail rank with conservative, inclusive handling of ties."""
+
+    def __init__(self, scores: np.ndarray) -> None:
+        values = np.asarray(scores, dtype=float)
+        if values.ndim != 1 or not len(values) or not np.isfinite(values).all():
+            raise ValueError("Cần một vector điểm hữu hạn, không rỗng.")
+        self.scores = np.sort(values)
+        self.scores.flags.writeable = False
+        self.n = len(values)
+
+    def top_fraction(self, score: np.ndarray | float) -> np.ndarray:
+        values = np.asarray(score, dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError("Điểm cần xếp hạng phải hữu hạn.")
+        return (self.n - np.searchsorted(self.scores, values, side="left")) / self.n
+
+    def level(self, score: np.ndarray | float) -> np.ndarray:
+        return -np.log10(np.clip(self.top_fraction(score), 1 / self.n, 1))
+
+
+def history_floor(row: Mapping[str, float]) -> float:
+    """Minimum observed borrowing age implied by available recency/window columns."""
+    return float(max(row["days_since_last_borrow"], row["days_since_last_activity"],
+                     30 if row["borrow_count_90d"] > row["borrow_count_30d"] else 0,
+                     7 if row["borrow_count_30d"] > row["borrow_count_7d"] else 0,
+                     1 if row["borrow_count_7d"] > row["borrow_count_1d"] else 0))
+
+
+def liquidation_history_grid(row: Mapping[str, float], ks: Sequence[int], hs: np.ndarray) -> pd.DataFrame:
+    """Build checked sensitivity rows, preserving liquidation counts in days 31–90."""
+    earlier = float(row["past_liquidation_count_90d"] - row["past_liquidation_count_30d"])
+    records = []
+    for k in ks:
+        for age in hs:
+            if age < history_floor(row) - 1e-6:
+                raise ValueError("Tuổi lịch sử giả định thấp hơn các cửa sổ quan sát của ca nền.")
+            changed = dict(row, past_liquidation_count_30d=float(k),
+                           past_liquidation_count_90d=float(k + earlier), borrower_history_days=float(age))
+            changed = recompute_derived(changed)
+            errors = validate_features(changed)
+            if errors:
+                raise ValueError("Lưới độ nhạy không hợp lệ: " + "; ".join(errors))
+            records.append({feature: changed[feature] for feature in summary()["features"]})
+    return pd.DataFrame(records, columns=summary()["features"])
+
+
+def lesson_point(row: Mapping[str, float], recent_liquidations: int, history_days: float) -> dict:
+    """Score one checked teaching scenario; carry no future outcome into the scenario."""
+    frame = liquidation_history_grid(row, [recent_liquidations], np.array([history_days]))
+    features = frame.iloc[0].to_dict()
+    results = {name: predict(features, name) for name in SCORE_COLUMNS}
+    unchanged = (recent_liquidations == row["past_liquidation_count_30d"]
+                 and np.isclose(history_days, row["borrower_history_days"], rtol=0, atol=1e-9))
+    return {"features": features, "results": results, "is_original": bool(unchanged)}
+
+
+def logistic_diagnostics(row: Mapping[str, float]) -> dict:
+    """Exact standardized linear contributions for one saved Logistic prediction."""
+    obj = load_model("Logistic")
+    pipe = obj["pipeline"]
+    values = np.array([[row[f] for f in obj["features"]]], dtype=np.float32)
+    scaled = pipe.named_steps["scale"].transform(pipe.named_steps["impute"].transform(values))
+    clf = pipe.named_steps["clf"]
+    contributions = clf.coef_[0] * scaled[0]
+    intercept = float(clf.intercept_[0])
+    margin = float(clf.decision_function(scaled)[0])
+    if not np.isclose(intercept + contributions.sum(), margin, rtol=0, atol=1e-6):
+        raise ValueError("Đóng góp Logistic không cộng đủ z.")
+    return {"contributions": pd.DataFrame({"feature": obj["features"], "contribution": contributions}),
+            "intercept": intercept, "margin": margin, "score": float(clf.predict_proba(scaled)[0, 1])}
+
+
+def forest_diagnostics(row: Mapping[str, float], tree_index: int = 0) -> dict:
+    """Read all fitted-tree scores and the complete decision path of one tree."""
+    obj = load_model("Random Forest")
+    pipe = obj["pipeline"]
+    values = np.array([[row[f] for f in obj["features"]]], dtype=np.float32)
+    values = pipe.named_steps["impute"].transform(values)
+    forest = pipe.named_steps["clf"]
+    scores = np.array([tree.predict_proba(values)[0, 1] for tree in forest.estimators_])
+    score = float(forest.predict_proba(values)[0, 1])
+    if not np.isclose(scores.mean(), score, rtol=0, atol=1e-12):
+        raise ValueError("Điểm rừng không bằng trung bình điểm các cây.")
+    estimator = forest.estimators_[tree_index]
+    tree = estimator.tree_
+    steps = []
+    for node in estimator.decision_path(values).indices:
+        index = tree.feature[node]
+        if index >= 0:
+            value = float(values[0, index])
+            steps.append({"Nút": int(node), "Biến": label(obj["features"][index]), "Giá trị ca": value,
+                          "Ngưỡng": float(tree.threshold[node]),
+                          "Rẽ": "Trái (≤)" if value <= tree.threshold[node] else "Phải (>)"})
+    return {"scores": scores, "score": score, "threshold": obj["threshold"], "steps": pd.DataFrame(steps),
+            "tree_score": float(scores[tree_index]), "leaf": int(estimator.apply(values)[0]),
+            "depth": estimator.get_depth(), "tree_count": len(scores)}
 
 
 def predict_frame(incoming):
