@@ -85,6 +85,7 @@ p { line-height: 1.8; }
 [data-testid="stMetricDelta"] { color: #9de2d9; }
 .stButton > button, .stDownloadButton > button { border-radius: 10px; min-height: 43px; font-weight: 500; border-color: rgba(210,225,245,.17); transition: background .15s, border-color .15s; }
 .stButton > button[kind="primary"] { background: #78dfd2; border-color: #78dfd2; color: #102824; box-shadow: 0 4px 18px rgba(105,222,208,.09); }
+.stButton button[kind="primary"] p, button[data-testid="stBaseButton-primary"] p { color: #102824 !important; }
 .stButton > button[kind="primary"]:hover { background: #9beadd; color: #102824; }
 .stButton > button[kind="secondary"]:hover, .stDownloadButton > button:hover { background: rgba(105,222,208,.08); border-color: rgba(105,222,208,.4); color: #c5f5ee; }
 [data-testid="stTextInputRootElement"], [data-baseweb="select"] > div { border-radius: 10px; }
